@@ -1,4 +1,5 @@
 export { Polyscope } from "./client.js";
+export { previewUrlMatches, toPreviewLookupUrl } from "./url-matching.js";
 
 export {
   PolyscopeError,

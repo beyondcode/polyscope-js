@@ -1,5 +1,6 @@
 import { HttpClient } from "./http.js";
 import { MissingApiTokenError } from "./errors.js";
+import { previewUrlMatches, toPreviewLookupUrl } from "./url-matching.js";
 import { Repository } from "./resources/repository.js";
 import { Server } from "./resources/server.js";
 import {
@@ -128,12 +129,37 @@ export class Polyscope {
     if (params?.serverId) query.server_id = params.serverId;
     if (params?.repositoryId) query.repository_id = params.repositoryId;
     if (params?.status) query.status = params.status;
+    if (params?.previewUrl) query.preview_url = params.previewUrl;
 
     const response = await http.get<{ data: WorkspaceData[] }>(
       "workspaces",
       query,
     );
     return response.data.map((w) => new Workspace(w, http));
+  }
+
+  /**
+   * Find workspaces whose preview URL matches the given URL.
+   *
+   * Normalizes `url` to the site base (origin + `/`, query string preserved)
+   * before calling the API and matching, so e.g. `https://app.test/dashboard`
+   * matches a workspace preview `https://app.test`.
+   *
+   * Sends the normalized URL to the server for efficient server-side filtering.
+   * Falls back to client-side matching if the server returns unfiltered results
+   * (for backward compatibility with servers that don't support the
+   * preview_url filter yet).
+   */
+  async findWorkspacesByPreviewUrl(url: string): Promise<Workspace[]> {
+    const lookup = toPreviewLookupUrl(url) ?? url;
+    const allWorkspaces = await this.workspaces({ previewUrl: lookup });
+
+    // If the server supports preview_url filtering, the results are already
+    // filtered. But for backward compatibility with older servers that ignore
+    // the preview_url param, apply client-side filtering as well.
+    return allWorkspaces.filter(
+      (ws) => ws.previewUrl != null && previewUrlMatches(ws.previewUrl, lookup),
+    );
   }
 
   async workspace(id: string): Promise<Workspace> {

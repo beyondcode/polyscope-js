@@ -126,6 +126,7 @@ export interface ListWorkspacesParams {
   serverId?: string | null;
   repositoryId?: string | null;
   status?: string | null;
+  previewUrl?: string | null;
 }
 
 export interface ListRepositoriesParams {
