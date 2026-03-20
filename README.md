@@ -5,13 +5,13 @@ A TypeScript/JavaScript SDK for the Polyscope API.
 ## Installation
 
 ```bash
-npm install polyscope
+npm install @polyscope/sdk
 ```
 
 ## Quick Start
 
 ```typescript
-import { Polyscope } from "polyscope";
+import { Polyscope } from "@polyscope/sdk";
 
 const polyscope = new Polyscope({ apiToken: "your-api-token" });
 
@@ -75,7 +75,7 @@ The SDK maps common HTTP/API failures to typed errors:
 Example:
 
 ```typescript
-import { Polyscope, ValidationError } from "polyscope";
+import { Polyscope, ValidationError } from "@polyscope/sdk";
 
 try {
   await polyscope.createWorkspace({ repositoryId: "" });

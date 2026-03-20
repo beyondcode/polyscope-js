@@ -1,5 +1,5 @@
 {
-  "name": "polyscope",
+  "name": "@polyscope/sdk",
   "version": "0.1.0",
   "description": "Official Polyscope SDK for JavaScript and TypeScript",
   "type": "module",
@@ -37,6 +37,13 @@
   ],
   "author": "Beyond Code",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/beyondcode/polyscope-js.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "devDependencies": {
     "@types/node": "^25.3.2",
     "tsup": "^8.4.0",
