@@ -1,21 +1,27 @@
 import { HttpClient } from "./http.js";
 import { MissingApiTokenError } from "./errors.js";
 import { previewUrlMatches, toPreviewLookupUrl } from "./url-matching.js";
+import { ServerModels } from "./resources/models.js";
 import { Repository } from "./resources/repository.js";
 import { Server } from "./resources/server.js";
+import { TeamInvite } from "./resources/team-invite.js";
 import {
   GenericResource,
   Workspace,
+  toCreateWorkspaceBody,
 } from "./resources/workspace.js";
 import { resolveApiToken } from "./utils/settings.js";
 import type {
   CreateWorkspaceParams,
   GenericResourceData,
+  ListModelsParams,
   ListRepositoriesParams,
   ListWorkspacesParams,
   PolyscopeConfig,
   RepositoryData,
   ServerData,
+  ServerModelsData,
+  TeamInviteData,
   WorkspaceData,
 } from "./types.js";
 
@@ -88,6 +94,29 @@ export class Polyscope {
     return response.data.map((s) => new Server(s));
   }
 
+  async models(params?: ListModelsParams): Promise<ServerModels[]> {
+    const http = await this.getHttp();
+    const query: Record<string, string> = {};
+    if (params?.serverId) {
+      query.server_id = params.serverId;
+    }
+
+    const response = await http.get<{ data: ServerModelsData[] }>(
+      "models",
+      query,
+    );
+    return response.data.map((m) => new ServerModels(m));
+  }
+
+  async inviteTeamMember(email: string): Promise<TeamInvite> {
+    const http = await this.getHttp();
+    const response = await http.post<{ data: TeamInviteData }>(
+      "team/invites",
+      { email },
+    );
+    return new TeamInvite(response.data);
+  }
+
   // --- Repositories ---
 
   async repositories(params?: ListRepositoriesParams): Promise<Repository[]> {
@@ -108,17 +137,9 @@ export class Polyscope {
 
   async createWorkspace(params: CreateWorkspaceParams): Promise<Workspace> {
     const http = await this.getHttp();
-    const body = {
-      repository_id: params.repositoryId,
-      prompt: params.prompt ?? undefined,
-      server_id: params.serverId ?? undefined,
-      issue_url: params.issueUrl ?? undefined,
-      pull_request_url: params.pullRequestUrl ?? undefined,
-    };
-
     const response = await http.post<{ data: WorkspaceData }>(
       "workspaces",
-      body,
+      toCreateWorkspaceBody(params),
     );
     return new Workspace(response.data, http);
   }
