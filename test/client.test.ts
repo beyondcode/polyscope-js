@@ -5,40 +5,14 @@ vi.mock("../src/utils/settings.js", () => ({
 }));
 
 import { Polyscope } from "../src/client.js";
-import { MissingApiTokenError } from "../src/errors.js";
+import { MissingApiTokenError, ValidationError } from "../src/errors.js";
+import { AvailableAgent, ServerModels } from "../src/resources/models.js";
+import { TeamInvite } from "../src/resources/team-invite.js";
 import { resolveApiToken } from "../src/utils/settings.js";
-import type { ServerData, WorkspaceData } from "../src/types.js";
+import type { ServerData } from "../src/types.js";
+import { mockFetch, sentRequest, workspaceData } from "./fixtures.js";
 
 const originalFetch = globalThis.fetch;
-
-function minimalWorkspace(overrides: Partial<WorkspaceData> = {}): WorkspaceData {
-  return {
-    id: "ws-1",
-    repo_id: "repo-1",
-    server_id: null,
-    branch: "main",
-    branch_renamed: false,
-    path: "/p",
-    preview_url: null,
-    status: "idle",
-    pr_number: null,
-    pr_url: null,
-    pr_title: null,
-    pr_body: null,
-    pr_is_draft: false,
-    issue_number: null,
-    issue_title: null,
-    issue_url: null,
-    base_branch: "main",
-    base_commit: "abc",
-    linked_worktree_ids: [],
-    created_at: "2020-01-01T00:00:00Z",
-    repository: null,
-    agent: null,
-    stats: null,
-    ...overrides,
-  };
-}
 
 describe("Polyscope", () => {
   beforeEach(() => {
@@ -97,11 +71,11 @@ describe("Polyscope", () => {
   it("findWorkspacesByPreviewUrl filters client-side when server ignores preview_url", async () => {
     const lookup = "https://app.test/";
     const workspaces = [
-      minimalWorkspace({
+      workspaceData({
         id: "a",
         preview_url: "https://app.test/?workspace=one",
       }),
-      minimalWorkspace({
+      workspaceData({
         id: "b",
         preview_url: "https://other.test/",
       }),
@@ -116,6 +90,164 @@ describe("Polyscope", () => {
     const found = await client.findWorkspacesByPreviewUrl(tabUrl);
 
     expect(found.map((w) => w.id)).toEqual(["a"]);
+  });
+
+  it("sends model, base_branch and linear_issue_url when creating a workspace", async () => {
+    const fetch = mockFetch({ data: workspaceData({ id: "ws-9" }) }, 201);
+
+    const client = new Polyscope({ apiToken: "tok", baseUrl: "https://api.test" });
+    const ws = await client.createWorkspace({
+      repositoryId: "repo-1",
+      serverId: "srv-1",
+      prompt: "Fix the login flow",
+      baseBranch: "develop",
+      model: "claude-opus",
+    });
+
+    expect(ws.id).toBe("ws-9");
+    expect(sentRequest(fetch)).toEqual({
+      url: "https://api.test/api/v1/workspaces",
+      method: "POST",
+      body: {
+        repository_id: "repo-1",
+        server_id: "srv-1",
+        prompt: "Fix the login flow",
+        base_branch: "develop",
+        model: "claude-opus",
+      },
+    });
+  });
+
+  it("sends linear_issue_url when creating a workspace from a Linear issue", async () => {
+    const fetch = mockFetch({ data: workspaceData() }, 201);
+
+    const client = new Polyscope({ apiToken: "tok", baseUrl: "https://api.test" });
+    await client.createWorkspace({
+      repositoryId: "repo-1",
+      linearIssueUrl: "https://linear.app/acme/issue/ABC-1",
+    });
+
+    expect(sentRequest(fetch).body).toEqual({
+      repository_id: "repo-1",
+      linear_issue_url: "https://linear.app/acme/issue/ABC-1",
+    });
+  });
+
+  it("maps url from the workspace response", async () => {
+    mockFetch({
+      data: workspaceData({
+        server_id: "srv-1",
+        url: "https://getpolyscope.com/servers/srv-1/session?workspace=ws-1",
+      }),
+    });
+
+    const client = new Polyscope({ apiToken: "tok", baseUrl: "https://api.test" });
+    const ws = await client.workspace("ws-1");
+
+    expect(ws.url).toBe(
+      "https://getpolyscope.com/servers/srv-1/session?workspace=ws-1",
+    );
+  });
+
+  it("lists models per server", async () => {
+    const fetch = mockFetch({
+      data: [
+        {
+          server_id: "srv-1",
+          agents: [
+            {
+              id: "claude",
+              name: "Claude",
+              models: ["claude-opus-5", "claude-sonnet-5"],
+            },
+            { id: "codex", name: "Codex", models: ["gpt-5.3-codex"] },
+          ],
+          models: ["claude-opus-5", "claude-sonnet-5", "gpt-5.3-codex"],
+          model_capabilities: [
+            {
+              value: "claude-opus-5",
+              displayName: "Opus 5",
+              supportsFastMode: true,
+              supportedEffortLevels: ["max", "high"],
+            },
+          ],
+        },
+      ],
+    });
+
+    const client = new Polyscope({ apiToken: "tok", baseUrl: "https://api.test" });
+    const result = await client.models();
+
+    expect(sentRequest(fetch).url).toBe("https://api.test/api/v1/models");
+    expect(result).toHaveLength(1);
+    expect(result[0]).toBeInstanceOf(ServerModels);
+    expect(result[0].serverId).toBe("srv-1");
+    expect(result[0].agents).toHaveLength(2);
+    expect(result[0].agents[0]).toBeInstanceOf(AvailableAgent);
+    expect(result[0].agents[0].id).toBe("claude");
+    expect(result[0].agents[0].name).toBe("Claude");
+    expect(result[0].agents[0].models).toEqual(["claude-opus-5", "claude-sonnet-5"]);
+    expect(result[0].models).toEqual(["claude-opus-5", "claude-sonnet-5", "gpt-5.3-codex"]);
+    expect(result[0].modelCapabilities[0].displayName).toBe("Opus 5");
+    expect(result[0].modelCapabilities[0].supportsFastMode).toBe(true);
+    expect(result[0].toJSON().model_capabilities[0].value).toBe("claude-opus-5");
+  });
+
+  it("passes server_id when listing models", async () => {
+    const fetch = mockFetch({
+      data: [{ server_id: "srv-1", agents: [], models: [], model_capabilities: [] }],
+    });
+
+    const client = new Polyscope({ apiToken: "tok", baseUrl: "https://api.test" });
+    const result = await client.models({ serverId: "srv-1" });
+
+    expect(sentRequest(fetch).url).toBe(
+      "https://api.test/api/v1/models?server_id=srv-1",
+    );
+    expect(result[0].agents).toEqual([]);
+    expect(result[0].modelCapabilities).toEqual([]);
+  });
+
+  it("invites a team member", async () => {
+    const fetch = mockFetch(
+      { data: { email: "teammate@example.com", invited: true } },
+      201,
+    );
+
+    const client = new Polyscope({ apiToken: "tok", baseUrl: "https://api.test" });
+    const invite = await client.inviteTeamMember("teammate@example.com");
+
+    expect(sentRequest(fetch)).toEqual({
+      url: "https://api.test/api/v1/team/invites",
+      method: "POST",
+      body: { email: "teammate@example.com" },
+    });
+    expect(invite).toBeInstanceOf(TeamInvite);
+    expect(invite.email).toBe("teammate@example.com");
+    expect(invite.invited).toBe(true);
+  });
+
+  it("throws ValidationError with the error code for a duplicate invite", async () => {
+    mockFetch(
+      {
+        error: {
+          code: "duplicate_invite",
+          message: "An invitation has already been sent to this email address.",
+        },
+      },
+      422,
+    );
+
+    const client = new Polyscope({ apiToken: "tok", baseUrl: "https://api.test" });
+    const error = await client
+      .inviteTeamMember("teammate@example.com")
+      .catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(ValidationError);
+    expect(error).toMatchObject({
+      errorCode: "duplicate_invite",
+      message: "An invitation has already been sent to this email address.",
+    });
   });
 
   it("clears cached HttpClient when setApiToken is called", async () => {

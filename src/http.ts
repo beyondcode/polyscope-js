@@ -3,7 +3,7 @@ import type { ApiErrorResponse } from "./types.js";
 
 const DEFAULT_BASE_URL = "https://getpolyscope.com";
 const DEFAULT_TIMEOUT = 30_000;
-const USER_AGENT = "Polyscope JS SDK/0.1";
+const USER_AGENT = "Polyscope JS SDK/0.2";
 
 export class HttpClient {
   private apiToken: string;

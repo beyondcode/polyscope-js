@@ -1,6 +1,6 @@
 import type { HttpClient } from "../http.js";
 import type { CreateWorkspaceParams, RepositoryData, WorkspaceData } from "../types.js";
-import { Workspace } from "./workspace.js";
+import { Workspace, toCreateWorkspaceBody } from "./workspace.js";
 
 export class Repository {
   readonly id: string;
@@ -8,7 +8,12 @@ export class Repository {
   readonly path: string;
   readonly baseBranch: string;
   readonly defaultModel: string | null;
+  readonly reviewModel: string | null;
+  readonly reviewPrompt: string | null;
+  readonly githubAssignSelfEnabled: boolean;
+  /** @deprecated No longer sent by the API, always `false`. Replaced by `githubAssignSelfEnabled`. */
   readonly githubReactionEnabled: boolean;
+  /** @deprecated No longer sent by the API, always `null`. */
   readonly githubReactionEmoji: string | null;
   readonly mergePrompt: string | null;
   readonly mergeAndPushPrompt: string | null;
@@ -16,6 +21,7 @@ export class Repository {
   readonly draftPrPrompt: string | null;
   readonly worktreeBaseFromOrigin: boolean | null;
   readonly hasRemote: boolean;
+  readonly nonGit: boolean;
   readonly linkedRepoIds: string[];
   readonly createdAt: string;
   readonly serverId: string | null;
@@ -29,14 +35,18 @@ export class Repository {
     this.path = data.path;
     this.baseBranch = data.base_branch;
     this.defaultModel = data.default_model;
-    this.githubReactionEnabled = data.github_reaction_enabled;
-    this.githubReactionEmoji = data.github_reaction_emoji;
+    this.reviewModel = data.review_model ?? null;
+    this.reviewPrompt = data.review_prompt ?? null;
+    this.githubAssignSelfEnabled = data.github_assign_self_enabled ?? false;
+    this.githubReactionEnabled = data.github_reaction_enabled ?? false;
+    this.githubReactionEmoji = data.github_reaction_emoji ?? null;
     this.mergePrompt = data.merge_prompt;
     this.mergeAndPushPrompt = data.merge_and_push_prompt;
     this.prPrompt = data.pr_prompt;
     this.draftPrPrompt = data.draft_pr_prompt;
     this.worktreeBaseFromOrigin = data.worktree_base_from_origin;
     this.hasRemote = data.has_remote;
+    this.nonGit = data.non_git ?? false;
     this.linkedRepoIds = data.linked_repo_ids;
     this.createdAt = data.created_at;
     this.serverId = data.server_id;
@@ -46,16 +56,11 @@ export class Repository {
   async createWorkspace(
     params: Omit<CreateWorkspaceParams, "repositoryId"> | string,
   ): Promise<Workspace> {
-    const body =
+    const body = toCreateWorkspaceBody(
       typeof params === "string"
-        ? { repository_id: this.id, prompt: params }
-        : {
-            repository_id: this.id,
-            prompt: params.prompt ?? undefined,
-            server_id: params.serverId ?? undefined,
-            issue_url: params.issueUrl ?? undefined,
-            pull_request_url: params.pullRequestUrl ?? undefined,
-          };
+        ? { repositoryId: this.id, prompt: params }
+        : { ...params, repositoryId: this.id },
+    );
 
     const response = await this.http.post<{ data: WorkspaceData }>(
       "workspaces",
@@ -71,14 +76,16 @@ export class Repository {
       path: this.path,
       base_branch: this.baseBranch,
       default_model: this.defaultModel,
-      github_reaction_enabled: this.githubReactionEnabled,
-      github_reaction_emoji: this.githubReactionEmoji,
+      review_model: this.reviewModel,
+      review_prompt: this.reviewPrompt,
+      github_assign_self_enabled: this.githubAssignSelfEnabled,
       merge_prompt: this.mergePrompt,
       merge_and_push_prompt: this.mergeAndPushPrompt,
       pr_prompt: this.prPrompt,
       draft_pr_prompt: this.draftPrPrompt,
       worktree_base_from_origin: this.worktreeBaseFromOrigin,
       has_remote: this.hasRemote,
+      non_git: this.nonGit,
       linked_repo_ids: this.linkedRepoIds,
       created_at: this.createdAt,
       server_id: this.serverId,

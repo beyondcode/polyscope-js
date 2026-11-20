@@ -13,28 +13,41 @@ export interface RepositoryData {
   path: string;
   base_branch: string;
   default_model: string | null;
-  github_reaction_enabled: boolean;
-  github_reaction_emoji: string | null;
+  review_model?: string | null;
+  review_prompt?: string | null;
+  github_assign_self_enabled?: boolean;
+  /** @deprecated No longer sent by the API. Replaced by `github_assign_self_enabled`. */
+  github_reaction_enabled?: boolean;
+  /** @deprecated No longer sent by the API. */
+  github_reaction_emoji?: string | null;
   merge_prompt: string | null;
   merge_and_push_prompt: string | null;
   pr_prompt: string | null;
   draft_pr_prompt: string | null;
   worktree_base_from_origin: boolean | null;
   has_remote: boolean;
+  non_git?: boolean;
   linked_repo_ids: string[];
   created_at: string;
   server_id: string | null;
 }
 
+export type WorkspaceStatus = "active" | "merged" | "archived";
+
+export type InterfaceMode = "chat" | "claude_terminal";
+
 export interface WorkspaceData {
   id: string;
   repo_id: string;
   server_id: string | null;
+  url?: string;
   branch: string;
   branch_renamed: boolean;
   path: string;
-  preview_url: string | null;
-  status: string;
+  interface_mode?: InterfaceMode;
+  model?: string | null;
+  preview_url?: string | null;
+  status: WorkspaceStatus;
   pr_number: number | null;
   pr_url: string | null;
   pr_title: string | null;
@@ -43,19 +56,30 @@ export interface WorkspaceData {
   issue_number: number | null;
   issue_title: string | null;
   issue_url: string | null;
-  base_branch: string;
-  base_commit: string;
+  base_branch: string | null;
+  base_commit: string | null;
+  label_id?: string | null;
+  is_repo_workspace?: boolean;
+  has_activity?: boolean;
+  linked_from_worktree_id?: string | null;
   linked_worktree_ids: string[];
   created_at: string;
-  repository: { id: string; name: string; full_name: string; path: string } | null;
-  agent: { status: string } | null;
-  stats: DiffStatsData | null;
+  repository?: { id: string; name: string; full_name: string; path: string } | null;
+  agent?: { status: string } | null;
+  stats?: DiffStatsData | null;
 }
+
+export type MessageRole =
+  | "user"
+  | "assistant"
+  | "tool_use"
+  | "tool_result"
+  | "thinking";
 
 export interface MessageData {
   id: number;
   session_id: string;
-  role: "user" | "assistant" | "system";
+  role: MessageRole;
   content: string;
   metadata: string | null;
   created_at: string;
@@ -93,7 +117,7 @@ export interface WorkspaceDiffData {
   stats: DiffStatsData;
   local: DiffSnapshotData;
   base: DiffSnapshotData;
-  commits_ahead: number;
+  commitsAhead: number;
 }
 
 export interface GenericResourceData {
@@ -103,12 +127,46 @@ export interface GenericResourceData {
   [key: string]: unknown;
 }
 
+export interface AvailableAgentData {
+  id: string;
+  name: string;
+  models: string[];
+}
+
+export interface ModelCapabilitiesData {
+  value: string;
+  resolvedModel?: string;
+  aliases?: string[];
+  displayName: string;
+  description?: string;
+  supportsEffort?: boolean;
+  supportedEffortLevels?: string[];
+  supportsFastMode?: boolean;
+}
+
+export interface ServerModelsData {
+  server_id: string;
+  agents: AvailableAgentData[];
+  models: string[];
+  model_capabilities: ModelCapabilitiesData[];
+}
+
+export interface TeamInviteData {
+  email: string;
+  invited: boolean;
+}
+
 export interface CreateWorkspaceParams {
   repositoryId: string;
+  /** Ignored by the API when `issueUrl`, `pullRequestUrl` or `linearIssueUrl` is set. */
   prompt?: string | null;
   serverId?: string | null;
+  /** Ignored by the API when `issueUrl`, `pullRequestUrl` or `linearIssueUrl` is set. */
+  baseBranch?: string | null;
+  model?: string | null;
   issueUrl?: string | null;
   pullRequestUrl?: string | null;
+  linearIssueUrl?: string | null;
 }
 
 export interface SendMessageParams {
@@ -116,20 +174,29 @@ export interface SendMessageParams {
   model?: string | null;
 }
 
+export interface CommitParams {
+  model?: string | null;
+}
+
 export interface CreatePullRequestParams {
   title?: string | null;
   body?: string | null;
   draft?: boolean;
+  model?: string | null;
 }
 
 export interface ListWorkspacesParams {
   serverId?: string | null;
   repositoryId?: string | null;
-  status?: string | null;
+  status?: WorkspaceStatus | null;
   previewUrl?: string | null;
 }
 
 export interface ListRepositoriesParams {
+  serverId?: string | null;
+}
+
+export interface ListModelsParams {
   serverId?: string | null;
 }
 

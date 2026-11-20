@@ -16,6 +16,8 @@ export {
 
 export { Server } from "./resources/server.js";
 export { Repository } from "./resources/repository.js";
+export { ServerModels, AvailableAgent } from "./resources/models.js";
+export { TeamInvite } from "./resources/team-invite.js";
 export {
   Workspace,
   WorkspaceDiff,
@@ -31,16 +33,25 @@ export type {
   ServerData,
   RepositoryData,
   WorkspaceData,
+  WorkspaceStatus,
+  InterfaceMode,
   MessageData,
+  MessageRole,
   DiffFileData,
   DiffStatsData,
   DiffSnapshotData,
   WorkspaceDiffData,
   GenericResourceData,
+  ServerModelsData,
+  AvailableAgentData,
+  ModelCapabilitiesData,
+  TeamInviteData,
   CreateWorkspaceParams,
   SendMessageParams,
+  CommitParams,
   CreatePullRequestParams,
   ListWorkspacesParams,
   ListRepositoriesParams,
+  ListModelsParams,
   PolyscopeConfig,
 } from "./types.js";
